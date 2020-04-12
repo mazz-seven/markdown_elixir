@@ -28,55 +28,13 @@ defmodule MarkdownElixir.Parser do
   whitespace = ascii_string([?\s, ?\n], min: 0)
   must_whitespace = ascii_string([?\s, ?\n], min: 1)
   zero_to_three_whitespace = ascii_string([?\s, ?\n], min: 0, max: 3)
+  line_break = ascii_string([?\n], min: 1)
 
-  thematic_break =
-    ignore(zero_to_three_whitespace)
-    |> choice([
-      times(string("-") |> concat(whitespace), min: 3),
-      times(string("*") |> concat(whitespace), min: 3),
-      times(string("_") |> concat(whitespace), min: 3)
-    ])
-    |> ignore(whitespace)
-    |> reduce({Enum, :join, [""]})
-    |> line()
-    |> post_traverse(:thematic_break)
 
-  defparsecp(
-    :end_of_heading,
-    must_whitespace |> times(string("#"), min: 1) |> concat(whitespace) |> eos(),
-    inline: true
-  )
-
-  heading =
-    ignore(zero_to_three_whitespace)
-    |> times(string("#"), min: 1, max: 6)
-    |> line()
-    |> ignore(must_whitespace)
-    |> repeat(lookahead_not(parsec(:end_of_heading)) |> utf8_char([]))
-    |> ignore(parsec(:end_of_heading) |> optional())
-    |> post_traverse(:heading_element)
-
-  defp heading_element(_rest, data, context, _line, _offset) do
-    [{header, {line, _}} | rest] = Enum.reverse(data)
-
-    {[
-       {"h#{length(header)}", [], [rest |> IO.iodata_to_binary() |> String.trim()], %{line: line}}
-     ], context}
-  end
-
-  defp thematic_break(_rest, data, context, _line, _offset) do
-    [{_break, {line, _}}] = data
-
-    {[
-       {"hr", [], [], %{line: line}}
-     ], context}
-  end
 
   defparsec(
     :root,
     choice([
-      thematic_break,
-      heading,
       text,
       whitespace
     ])
